@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>مستندات جامع و دقیق API — سیستم مدیریت فرش فلاح</title>
+  <style>
+    :root{--bg:#fbfcfd;--card:#ffffff;--accent:#0ea5a3;--muted:#6b7280;--shadow:0 8px 30px rgba(2,6,23,0.06)}
+    body{font-family:"Vazirmatn",sans-serif;background:var(--bg);padding:28px;color:#07132a;line-height:1.7}
+    .container{max-width:1100px;margin:0 auto}
+    h1{margin:0 0 8px}
+    .muted{color:var(--muted)}
+    .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:var(--shadow);margin:18px 0}
+    .endpoint{border-right:6px solid var(--accent)}
+    .method{display:inline-block;padding:6px 10px;border-radius:6px;color:#fff;font-weight:700;margin-left:8px}
+    .GET{background:#16a34a}.POST{background:#2563eb}.PATCH{background:#f59e0b}.DELETE{background:#ef4444}
+    pre{background:#0f172a;color:#f8fafc;padding:12px;border-radius:8px;overflow:auto}
+    code{background:#f1f5f9;padding:2px 6px;border-radius:6px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    table th,table td{padding:8px;border-bottom:1px solid #eef2f7;text-align:right}
+    .small{font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📘 مستندات جامع و دقیق API — سیستم مدیریت فرش فلاح</h1>
+    <p class="muted">این سند کامل‌ترین توضیح دربارهٔ پروژهٔ فعلی شماست: ساختار مدل‌ها، رفتار endpointها، نحوهٔ پردازش تصویر، مثال‌های request/response، خطاها و نکات پیاده‌سازی و بهینه‌سازی. همهٔ مثال‌ها مطابق کد واقعی شما آماده شده‌اند.</p>
+
+    <section class="card">
+      <h2>فهرست سریع</h2>
+      <ul class="small">
+        <li><a href="#products">محصولات (Products)</a></li>
+        <li><a href="#orders">سفارش‌ها (Orders)</a></li>
+        <li><a href="#reports">گزارش‌ها (Reports)</a></li>
+        <li><a href="#images">پردازش تصویر</a></li>
+        <li><a href="#errors">خطاها و اعتبارسنجی</a></li>
+        <li><a href="#examples">مثال‌های کامل (curl / Postman)</a></li>
+        <li><a href="#tips">نکات فنی و بهینه‌سازی</a></li>
+        <li><a href="#tests">آزمایش و تست</a></li>
+      </ul>
+    </section>
+
+    <!-- PRODUCTS -->
+    <section id="products" class="card endpoint">
+      <h2>🧶 محصولات (Products)</h2>
+      <p class="muted">مدل اصلی: <code>Product</code>. فیلدهای مهم: <code>type, branch, name, unit_price, sale_price, size, length, width, image</code>.</p>
+
+      <article class="card endpoint">
+        <h3><span class="method GET">GET</span> /api/products/ — لیست، جستجو، فیلتر و مرتب‌سازی</h3>
+
+        <h4>پارامترهای Query</h4>
+        <table>
+          <thead><tr><th>پارامتر</th><th>کاربرد</th><th>مثال</th></tr></thead>
+          <tbody>
+            <tr><td><code>search</code></td><td>جستجوی چندکلمه‌ای در name, description, serial_number, branch, size</td><td><code>?search=تبریز+ابریشم</code></td></tr>
+            <tr><td><code>type</code></td><td>فیلتر نوع: <code>carpet</code> یا <code>tableau</code></td><td><code>?type=carpet</code></td></tr>
+            <tr><td><code>branch</code></td><td>فیلتر شاخه‌ها</td><td><code>?branch=naein</code></td></tr>
+            <tr><td><code>min_price / max_price</code></td><td>فیلتر قیمت (روی unit_price)</td><td><code>?min_price=5000000&amp;max_price=15000000</code></td></tr>
+            <tr><td><code>size</code></td><td>فیلد size مخصوص <code>carpet</code></td><td><code>?size=2x3</code></td></tr>
+            <tr><td><code>min_length / max_length</code></td><td>ابعاد مخصوص <code>tableau</code></td><td><code>?min_length=60&amp;max_length=120</code></td></tr>
+            <tr><td><code>sort</code></td><td>مرتب‌سازی: <code>newest, oldest, price_low, price_high</code></td><td><code>?sort=price_high</code></td></tr>
+          </tbody>
+        </table>
+
+        <h4>مثال واقعی</h4>
+        <pre>GET /api/products/?search=ابریشم+تبریز&amp;type=carpet&amp;min_price=5000000&amp;sort=price_high</pre>
+
+        <h4>نمونه پاسخ</h4>
+        <pre>[
+  {
+    "id": 12,
+    "type": "carpet",
+    "branch": "tabriz",
+    "serial_number": "T-889",
+    "name": "فرش تبریز شاهکار",
+    "unit_price": "12000000.00",
+    "sale_price": "15000000.00",
+    "size": "2x3",
+    "image": "/media/products/x.webp",
+    "created_at": "1403/12/03 - 10:22",
+    "updated_at": "1403/12/03 - 10:22"
+  }
+]</pre>
+
+        <h4>نکات پیاده‌سازی</h4>
+        <ul>
+          <li>جستجو قبل از فیلترها انجام می‌شود و برای فارسی حروف و نیم‌فاصله نرمال‌سازی گردد.</li>
+          <li>برای سرعت زیاد از <code>select_related</code> / <code>prefetch_related</code> در ViewSet استفاده کن.</li>
+        </ul>
+      </article>
+
+      <article class="card endpoint">
+        <h3><span class="method POST">POST</span> /api/products/ — ایجاد محصول</h3>
+        <p>فرانت باید <code>multipart/form-data</code> ارسال کند اگر عکس همراه است.</p>
+
+        <h4>نمونه body</h4>
+        <pre>Content-Type: multipart/form-data
+
+{
+  "type": "tableau",
+  "branch": "manzare",
+  "name": "تابلو منظره",
+  "unit_price": 8000000,
+  "sale_price": 9500000,
+  "length": 70,
+  "width": 100,
+  "image": (file)
+}
+</pre>
+
+        <h4>رفتار تصویر</h4>
+        <p>قبل از ذخیره تابع <code>process_image</code> فراخوانی می‌شود که تصویر را <strong>center-crop</strong> کرده، به 300×500 تغییر اندازه می‌دهد و فشرده می‌کند (WEBP پیش‌فرض).</p>
+      </article>
+
+      <article class="card endpoint">
+        <h3><span class="method PATCH">PATCH</span> /api/products/{id}/ — ویرایش</h3>
+        <pre>{ "sale_price": 12500000 }</pre>
+
+        <h3 style="margin-top:8px"><span class="method DELETE">DELETE</span> /api/products/{id}/ — حذف</h3>
+      </article>
+    </section>
+
+    <!-- ORDERS -->
+    <section id="orders" class="card endpoint">
+      <h2>🧾 سفارش‌ها (Orders)</h2>
+      <p class="muted">مدل‌های اصلی: <code>Order</code> و <code>OrderItem</code>. منطق محاسباتیِ سفارش در <code>OrderCreateSerializer.create()</code> و در <code>OrderItem.save()</code> انجام می‌شود — مطابق کدی که در پروژه قرار دارد.</p>
+
+      <article class="card endpoint">
+        <h3><span class="method POST">POST</span> /api/orders/ — ایجاد سفارش</h3>
+
+        <h4>ورودی (مثال)</h4>
+        <pre>{
+  "customer_name": "علی",
+  "customer_phone": "09120000000",
+  "customer_address": "قم",
+  "items": [
+    { "product": 1, "discount": 150000 },
+    { "product": 2 }
+  ]
+}</pre>
+
+        <h4>گام‌به‌گام محاسبات (مثال عددی)</h4>
+        <p>فرض کنیم محصول A: <code>unit_price=2,000,000</code>, <code>sale_price=2,500,000</code> و discount=300,000</p>
+        <ol>
+          <li><strong>price</strong> = sale_price = 2,500,000</li>
+          <li><strong>final_price</strong> = price − discount = 2,200,000</li>
+          <li><strong>profit</strong> = final_price − unit_price = 200,000</li>
+        </ol>
+        <p>اگر سفارش شامل چند آیتم باشد، <code>total_price</code> برابر جمع همه <code>final_price</code>ها و <code>total_profit</code> برابر جمع همه <code>profit</code>ها خواهد بود.</p>
+
+        <h4>پیاده‌سازی داخل پروژه</h4>
+        <pre class="small"># خلاصه از OrderCreateSerializer.create()
+order = Order.objects.create(..., total_price=0, total_profit=0)
+for item in items:
+    product = Product.objects.get(pk=...)
+    price = product.sale_price or product.unit_price
+    final_price = price - discount
+    profit = final_price - product.unit_price
+    OrderItem.objects.create(order=order, product=product, price=price, discount=discount, final_price=final_price, profit=profit)
+order.total_price = sum(final_price)
+order.total_profit = sum(profit)
+order.save()</pre>
+
+      </article>
+
+      <article class="card endpoint">
+        <h3><span class="method GET">GET</span> /api/orders/ — لیست سفارش‌ها</h3>
+
+        <h4>نمونه‌ی کامل پاسخ (همان‌طور که الان پروژه برمی‌گرداند)</h4>
+        <pre>{
+  "id": 3,
+  "customer_name": "علی",
+  "customer_phone": "09120000000",
+  "customer_address": "قم",
+  "total_price": "4900000.00",
+  "total_profit": "600000.00",
+  "order_date": "1403/12/05 - 14:33",
+  "items": [
+    {
+      "id": 17,
+      "product": { /* ProductSerializer full */ },
+      "price": "2500000.00",
+      "discount": "300000.00",
+      "discount_percent": 12.0,
+      "final_price": "2200000.00",
+      "profit": "200000.00",
+      "created_at": "1403/12/05 - 14:33"
+    }
+  ]
+}
+</pre>
+
+        <h4>پاسخ کوتاه به سؤالت</h4>
+        <p>بله؛ <strong>profit هر آیتم</strong> و <strong>total_profit سفارش</strong> در بک‌اند محاسبه و در خروجی <code>GET /api/orders/</code> نمایش داده می‌شود. نیازی نیست فرانت چیزی در مورد profit ارسال کند.</p>
+      </article>
+
+    </section>
+
+    <!-- REPORTS -->
+    <section id="reports" class="card endpoint">
+      <h2>📊 گزارش‌ها (Reports)</h2>
+      <p class="muted">Endpoints گزارش طبق کد شما: sales_by_product, total_revenue, total_profit, daily_sales, monthly_sales, yearly_sales, top_products, sales_range, dashboard.</p>
+
+      <article class="card endpoint">
+        <h3><span class="method GET">GET</span> /api/reports/sales_by_product/</h3>
+        <pre>[{ "product": 1, "product__name": "فرش تبریز", "sales_count": 12, "revenue": 12000000 }]</pre>
+      </article>
+
+      <article class="card endpoint">
+        <h3><span class="method GET">GET</span> /api/reports/total_profit/</h3>
+        <pre>{ "total_profit": 4500000 }</pre>
+        <p class="muted">این مقدار مجموع <code>total_profit</code> مربوط به جدول <code>Order</code> است.</p>
+      </article>
+
+    </section>
+
+    <!-- IMAGE PROCESSING -->
+    <section id="images" class="card endpoint">
+      <h2>🖼️ پردازش تصویر (Image Optimization)</h2>
+      <p class="muted">تابع نمونه در پروژه: <code>process_image(image, size=(300,500), target_kb=100, format='WEBP')</code></p>
+
+      <h4>کد نمونهٔ پیشنهادی (Pillow)</h4>
+      <pre>from PIL import Image
+from io import BytesIO
+from django.core.files.uploadedfile import InMemoryUploadedFile
+
+def process_image(uploaded_file, size=(300,500), target_kb=100, output_format='WEBP'):
+    img = Image.open(uploaded_file).convert('RGBA')
+    # center crop to aspect ratio then resize to exact size
+    # (کد کراپ و resize...)
+    buffer = BytesIO()
+    quality = 90
+    while True:
+        buffer.seek(0); buffer.truncate()
+        img.save(buffer, format=output_format, quality=quality)
+        if buffer.tell()/1024 <= target_kb or quality <= 30:
+            break
+        quality -= 10
+    buffer.seek(0)
+    return InMemoryUploadedFile(buffer, None, f"img.{output_format.lower()}", f"image/{output_format.lower()}", buffer.getbuffer().nbytes, None)
+</pre>
+
+      <h4>توصیه‌ها</h4>
+      <ul>
+        <li>روی سرور توسعه از WebP استفاده کن؛ اگر کلاینت قدیمی داری، fallback به JPEG فراهم کن.</li>
+        <li>برای ترافیک بالا از پردازش آسنکرون (Celery) استفاده کن.</li>
+      </ul>
+    </section>
+
+    <!-- ERRORS & VALIDATION -->
+    <section id="errors" class="card endpoint">
+      <h2>⚠️ خطاها و اعتبارسنجی</h2>
+      <h4>مثال خطای اعتبارسنجی (400)</h4>
+      <pre>{ "items": ["items must be a non-empty list"] }</pre>
+
+      <h4>چک‌های مدل</h4>
+      <ul>
+        <li>unit_price و sale_price از لحاظ <code>CheckConstraint</code> غیرمنفی هستند.</li>
+        <li>در Serializer قوانین type vs size/length بررسی می‌شود.</li>
+      </ul>
+    </section>
+
+    <!-- EXAMPLES -->
+    <section id="examples" class="card endpoint">
+      <h2>📁 مثال‌ها (curl / مثال Postman)</h2>
+
+      <h4>ایجاد محصول با curl (عکس)</h4>
+      <pre>curl -X POST "http://127.0.0.1:8000/api/products/" \
+  -H "Authorization: Token <TOKEN>" \
+  -F "type=carpet" \
+  -F "branch=tabriz" \
+  -F "name=فرش تبریز" \
+  -F "unit_price=12000000" \
+  -F "size=2x3" \
+  -F "image=@/path/to/file.jpg"</pre>
+
+      <h4>ایجاد سفارش با curl</h4>
+      <pre>curl -X POST "http://127.0.0.1:8000/api/orders/" \
+  -H "Content-Type: application/json" \
+  -d '{"customer_name":"علی","items":[{"product":1,"discount":150000}]}'</pre>
+    </section>
+
+    <!-- TIPS -->
+    <section id="tips" class="card endpoint">
+      <h2>⚙️ نکات فنی و بهینه‌سازی</h2>
+      <ul>
+        <li>برای سرعت: از <code>prefetch_related('items__product')</code> در OrderViewSet استفاده شده است.</li>
+        <li>برای بار زیاد: پردازش تصویر را به Celery منتقل کن و در پاسخ اولیه یک URL موقتی ارسال کن.</li>
+        <li>برای جستجوی بهتر فارسی: normalize کنید (ک/کاف، ی/یاء، حذف نیم‌فاصله) و اگر نیاز است از Postgres trigram یا ElasticSearch استفاده کنید.</li>
+        <li>مقادیر پولی را همیشه با <code>Decimal</code> مدیریت کن تا خطاهای اعشاری پیش نیاید.</li>
+      </ul>
+    </section>
+
+    <!-- TESTS -->
+    <section id="tests" class="card endpoint">
+      <h2>🧪 تست و اعتبارسنجی</h2>
+      <p class="muted">نمونه تست‌های واحد (pytest / Django TestCase)</p>
+      <pre>def test_create_order_creates_items_and_totals(client, django_db):
+    payload = {"customer_name":"علی","items":[{"product":product.id,"discount":10000}]}
+    res = client.post('/api/orders/', payload, content_type='application/json')
+    assert res.status_code == 201
+    data = res.json()
+    assert data['total_price'] == expected_total
+    assert data['total_profit'] == expected_profit
+</pre>
+    </section>
+
+    <footer class="muted small">اگر بخواهی من این سند را به PDF تبدیل کنم یا نسخهٔ Markdown/Swagger/OpenAPI تهیه کنم — بگو تا کاملش کنم (با نمونه Postman collection هم آماده می‌کنم).</footer>
+  </div>
+</body>
+</html>
