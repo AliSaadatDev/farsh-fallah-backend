@@ -42,6 +42,7 @@ class Product(models.Model):
     TYPE_CHOICES = [
         ('carpet', 'فرش'),
         ('tableau', 'تابلو فرش'),
+        ("worked", "کار کرده"), 
     ]
 
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
@@ -85,6 +86,11 @@ class Order(models.Model):
 
     class Meta:
         ordering = ["-order_date"]
+        indexes = [
+            models.Index(fields=['customer_city']),
+            models.Index(fields=['customer_state']),
+            models.Index(fields=['customer_region']),
+        ]
 
     def __str__(self):
         return f"Order #{self.id} - {self.customer_name}"

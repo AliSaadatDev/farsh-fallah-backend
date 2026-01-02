@@ -23,10 +23,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-ozzd&=0!sb=_(%l7rvpm#tv#j@^842+v@iy$_d%@@b+-el944='
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*',
-                 'farsh-api.onrender.com',
+                 '5b17656b0b5c.ngrok-free.app',
                  'localhost',
                  '127.0.0.1',
 ]
@@ -63,6 +63,14 @@ MIDDLEWARE = [
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 30,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    #'DEFAULT_THROTTLE_RATES': {
+    #    'anon': '100/hour',
+    #    'user': '1000/hour'
+    #}
     #'DEFAULT_AUTHENTICATION_CLASSES': (
     #    'rest_framework_simplejwt.authentication.JWTAuthentication',
     #),
@@ -74,15 +82,13 @@ REST_FRAMEWORK = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-#CSRF_TRUSTED_ORIGINS = [
-#     'https://*.ngrok-free.app',
-#]
-
-
-#CORS_ALLOWED_ORIGINS = [
-#    "http://localhost:3000",
-#    "https://d5c05f0b12.ngrok-free.app"
-#]
+CSRF_TRUSTED_ORIGINS = [
+     'https://*.ngrok-free.app',
+]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://5b17656b0b5c.ngrok-free.app"
+]
 
 
 ROOT_URLCONF = 'farsh.urls'
@@ -140,7 +146,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Tehran'
 
 USE_I18N = True
 

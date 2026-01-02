@@ -26,15 +26,54 @@ class JalaliDateTimeField(serializers.Field):
 class ProductSerializer(serializers.ModelSerializer):
     created_at = JalaliDateTimeField(read_only=True)
     updated_at = JalaliDateTimeField(read_only=True)
+    branch_display = serializers.SerializerMethodField(read_only=True)
+
+    # Branch mappings
+    CARPET_BRANCHES_DISPLAY = {
+        "abrisham_qom": "ابریشم طرح قم",
+        "tabriz": "تبریز",
+        "naein": "نائین",
+        "hood_birjand": "هود بیرجند",
+        "qashqai": "قشقایی",
+        "arak": "اراک",
+        "qom": "قم",
+        "torkaman": "ترکمن",
+        "esfahan": "اصفهان",
+        "saregh": "سارق",
+        "ashayeri": "عشایری",
+        "bakhtiar": "بختیار",
+        "ardakan": "اردکان",
+        "kashan": "کاشان",
+        "kashm": "کاشم",
+        "other_carpet": "متفرقه",
+    }
+    
+    TABLEAU_BRANCHES_DISPLAY = {
+        "gol": "گل",
+        "fransi": "فرانسوی",
+        "mazhabi": "مذهبی",
+        "animal": "حیوان و پرنده",
+        "other_tableau": "متفرقه",
+        "abrisham_qom": "ابریشم طرح قم",
+        "chehre": "چهره",
+        "tarikhi": "تاریخی",
+        "manzare": "منظره",
+    }
 
     class Meta:
         model = Product
         fields = [
-            "id", "type", "branch", "serial_number", "name", "description",
+            "id", "type", "branch", "branch_display", "serial_number", "name", "description",
             "unit_price", "sale_price", "image", "length", "width", "size", "crop_sex",
             "created_at", "updated_at"
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "branch_display"]
+
+    def get_branch_display(self, obj):
+        if obj.type == "carpet":
+            return self.CARPET_BRANCHES_DISPLAY.get(obj.branch, obj.branch)
+        else:  # tableau
+            return self.TABLEAU_BRANCHES_DISPLAY.get(obj.branch, obj.branch)
 
     def create(self, validated_data):
         image = validated_data.get("image")

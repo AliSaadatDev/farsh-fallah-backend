@@ -6,7 +6,6 @@ from .vies_docs import api_docs
 router = routers.DefaultRouter()
 router.register(r'products', ProductViewSet)
 router.register(r'orders', OrderViewSet)
-# stockins removed
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -18,5 +17,9 @@ urlpatterns = [
     path('reports/top_products/', ReportsViewSet.as_view({'get': 'top_products'})),
     path('reports/sales_range/', ReportsViewSet.as_view({'get': 'sales_range'})),
     path('reports/dashboard/', ReportsViewSet.as_view({'get': 'dashboard'})),
+    path('reports/customers_by_region/', ReportsViewSet.as_view({'get': 'customers_by_region'})),
+    path('reports/customers-by-region/', ReportsViewSet.as_view({'get': 'customers_by_region'})),
+    path('reports/chart-sales/', ReportsViewSet.as_view({'get': 'chart_sales'})),
+    path('reports/chart_sales/', ReportsViewSet.as_view({'get': 'chart_sales'})),
     path('docs/', api_docs, name='api_docs'),
 ]

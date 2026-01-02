@@ -2,10 +2,12 @@ from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
-from django.db.models import Count, Sum, F, Q
+from django.db.models import Count, Sum, F, Q, IntegerField
 from django.utils import timezone
 from .models import Product, Order, OrderItem, CARPET_BRANCHES, TABLEAU_BRANCHES
 from .serializers import ProductSerializer, OrderSerializer, OrderCreateSerializer
+from datetime import datetime, timedelta
+from django.db.models.functions import TruncDate, Cast
 
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -101,6 +103,29 @@ class ProductViewSet(viewsets.ModelViewSet):
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all().order_by("-order_date").prefetch_related('items__product')
+    serializer_class = OrderSerializer
+    search_fields = ['customer_name', 'customer_phone', 'customer_address', 'customer_city', 'customer_region']
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        search = params.get("search")
+        if search:
+            normalized = search.replace("ي", "ی").replace("ك", "ک").strip()
+            words = normalized.split()
+
+            for w in words:
+                qs = qs.filter(
+                    Q(customer_name__icontains=w) |
+                    Q(customer_phone__icontains=w) |
+                    Q(customer_address__icontains=w) |
+                    Q(customer_city__icontains=w) |
+                    Q(customer_region__icontains=w)
+                )
+            
+        return qs
+
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -114,10 +139,6 @@ class OrderViewSet(viewsets.ModelViewSet):
 
 
 class ReportsViewSet(viewsets.ViewSet):
-    """
-    Reports using final_price and profit fields.
-    """
-
     @action(detail=False, methods=['get'])
     def sales_by_product(self, request):
         qs = OrderItem.objects.values('product', 'product__name').annotate(
@@ -135,42 +156,6 @@ class ReportsViewSet(viewsets.ViewSet):
     def total_profit(self, request):
         total = Order.objects.aggregate(total_profit=Sum(F('total_profit'))) or {'total_profit': 0}
         return Response(total)
-
-    @action(detail=False, methods=['get'])
-    def daily_sales(self, request):
-        today = timezone.localdate()
-        total = Order.objects.filter(order_date__date=today).aggregate(total=Sum("total_price"))
-        total_sales = total.get("total") or 0
-        total_profit_agg = Order.objects.filter(order_date__date=today).aggregate(total_profit=Sum("total_profit"))
-        total_profit = total_profit_agg.get("total_profit") or 0
-        return Response({"date": str(today), "total_sales": total_sales, "total_profit": total_profit})
-
-    @action(detail=False, methods=['get'])
-    def monthly_sales(self, request):
-        today = timezone.localdate()
-        one_month_ago = today - timezone.timedelta(days=30)
-        
-        total = Order.objects.filter(order_date__date__range=[one_month_ago, today]).aggregate(total=Sum("total_price"))
-        month_sales = total.get("total") or 0
-        total_profit_agg = Order.objects.filter(order_date__date__range=[one_month_ago, today]).aggregate(total_profit=Sum("total_profit"))
-        month_profit = total_profit_agg.get("total_profit") or 0
-        
-        return Response({
-            "start_date": str(one_month_ago),
-            "end_date": str(today),
-            "days": 30,
-            "total_sales": month_sales,
-            "total_profit": month_profit
-        })
-
-    @action(detail=False, methods=['get'])
-    def yearly_sales(self, request):
-        year = timezone.now().year
-        total = Order.objects.filter(order_date__year=year).aggregate(total=Sum("total_price"))
-        year_sales = total.get("total") or 0
-        total_profit_agg = Order.objects.filter(order_date__year=year).aggregate(total_profit=Sum("total_profit"))
-        year_profit = total_profit_agg.get("total_profit") or 0
-        return Response({"year": year, "total_sales": year_sales, "total_profit": year_profit})
 
     @action(detail=False, methods=['get'])
     def top_products(self, request):
@@ -197,7 +182,6 @@ class ReportsViewSet(viewsets.ViewSet):
     def dashboard(self, request):
         today = timezone.localdate()
         year, month = today.year, today.month
-
         today_sales = Order.objects.filter(order_date__date=today).aggregate(total=Sum("total_price"))
         today_sales = today_sales.get("total") or 0
         today_profit_agg = Order.objects.filter(order_date__date=today).aggregate(total_profit=Sum("total_profit"))
@@ -236,26 +220,241 @@ class ReportsViewSet(viewsets.ViewSet):
             "last_7_days": last_7,
             "inventory_value": inventory_value
         })
+    
+
+    @action(detail=False, methods=['get'])
+    def chart_sales(self, request):
+        period = request.query_params.get('period')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        now = timezone.now()
+        today = timezone.localdate()
+    
+        # ---------------- TODAY (hourly) ----------------
+        def get_today_data():
+            data = []
+            for i in range(23, -1, -1):
+                hour_start = now - timedelta(hours=i)
+                hour_end = hour_start - timedelta(hours=1)
+    
+                agg = Order.objects.filter(
+                    order_date__gte=hour_end,
+                    order_date__lt=hour_start
+                ).aggregate(
+                    sales=Sum("total_price"),
+                    profit=Sum("total_profit")
+                )
+    
+                data.append({
+                    "label": hour_end.strftime("%H:%M"),
+                    "sales": agg["sales"] or 0,
+                    "profit": agg["profit"] or 0,
+                })
+            return data
+    
+        # ---------------- WEEK (daily) ----------------
+        def get_week_data():
+            data = []
+            qs = (
+                Order.objects
+                .filter(order_date__date__gte=today - timedelta(days=6))
+                .annotate(day=TruncDate("order_date"))
+                .values("day")
+                .annotate(
+                    sales=Sum("total_price"),
+                    profit=Sum("total_profit")
+                )
+            )
+    
+            qs_map = {item["day"]: item for item in qs}
+    
+            for i in range(6, -1, -1):
+                day = today - timedelta(days=i)
+                item = qs_map.get(day)
+                data.append({
+                    "label": str(day),
+                    "sales": item["sales"] if item else 0,
+                    "profit": item["profit"] if item else 0,
+                })
+            return data
+    
+        # ---------------- MONTH (daily) ----------------
+        def get_month_data():
+            data = []
+            start = today - timedelta(days=29)
+    
+            qs = (
+                Order.objects
+                .filter(order_date__date__range=(start, today))
+                .annotate(day=TruncDate("order_date"))
+                .values("day")
+                .annotate(
+                    sales=Sum("total_price"),
+                    profit=Sum("total_profit")
+                )
+            )
+    
+            qs_map = {item["day"]: item for item in qs}
+    
+            current = start
+            while current <= today:
+                item = qs_map.get(current)
+                data.append({
+                    "label": str(current),
+                    "sales": item["sales"] if item else 0,
+                    "profit": item["profit"] if item else 0,
+                })
+                current += timedelta(days=1)
+    
+            return data
+    
+        # ---------------- YEAR (monthly) ----------------
+        def get_year_data():
+            data = []
+    
+            for i in range(11, -1, -1):
+                month_date = today - timedelta(days=i * 30)
+                year = month_date.year
+                month = month_date.month
+    
+                agg = Order.objects.filter(
+                    order_date__year=year,
+                    order_date__month=month
+                ).aggregate(
+                    sales=Sum("total_price"),
+                    profit=Sum("total_profit")
+                )
+    
+                data.append({
+                    "label": f"{year}-{month:02d}",
+                    "sales": agg["sales"] or 0,
+                    "profit": agg["profit"] or 0,
+                })
+    
+            return data
+    
+        # ---------------- CUSTOM RANGE ----------------
+        def get_custom_range_data(start_date, end_date):
+            data = []
+    
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    
+            qs = (
+                Order.objects
+                .filter(order_date__date__range=(start, end))
+                .annotate(day=TruncDate("order_date"))
+                .values("day")
+                .annotate(
+                    sales=Sum("total_price"),
+                    profit=Sum("total_profit"),
+                    count = Count("id"),
+                )
+                .order_by("day")
+            )            
+
+            qs_map = {item["day"]: item for item in qs}
+
+            total_sales = 0
+            total_profit = 0
+            total_count = 0
+            
+            current = start
+            while current <= end:
+                item = qs_map.get(current)
+                sales = item["sales"] if item else 0
+                profit = item["profit"] if item else 0
+                count = item["count"] if item else 0
+
+                total_sales += sales
+                total_profit += profit
+                total_count += count
+
+                data.append({
+                    "label": str(current),
+                    "sales": item["sales"] if item else 0,
+                    "profit": item["profit"] if item else 0,
+                    "count": item["count"] if item else 0,
+                })
+                current += timedelta(days=1)
+    
+            return {
+                "period": "custom",
+                "start_date": start_date,
+                "end_date": end_date,
+                "total_sales": total_sales,
+                "total_profit": total_profit,
+                "total_count": total_count,
+                "data": data
+            }
+    
+        # ---------------- PRIORITY: CUSTOM RANGE ----------------
+        if start_date and end_date:
+            return Response({
+                "period": "custom",
+                "start_date": start_date,
+                "end_date": end_date,
+                "data": get_custom_range_data(start_date, end_date)
+            })
+    
+        # ---------------- DEFAULT (ALL) ----------------
+        if period is None:
+            return Response({
+                "today": {"period": "today", "data": get_today_data()},
+                "week": {"period": "week", "data": get_week_data()},
+                "month": {"period": "month", "data": get_month_data()},
+                "year": {"period": "year", "data": get_year_data()},
+            })
+    
+        # ---------------- SINGLE PERIOD ----------------
+        if period == "today":
+            return Response({"period": period, "data": get_today_data()})
+    
+        if period == "week":
+            return Response({"period": period, "data": get_week_data()})
+    
+        if period == "month":
+            return Response({"period": period, "data": get_month_data()})
+    
+        if period == "year":
+            return Response({"period": period, "data": get_year_data()})
+    
+        return Response(
+            {"error": "period باید یکی از today, week, month, year باشد یا start_date و end_date ارسال شود"},
+            status=400
+        )
 
     @action(detail=False, methods=['get'])
     def customers_by_region(self, request):
-        orders = Order.objects.filter(
-            customer_city='تهران',
-            customer_region__isnull=False
-        ).exclude(customer_region='').values('customer_region').annotate(
-            customer_count=Count('customer_name', distinct=True),
-            order_count=Count('id')
-        ).order_by('customer_region')
-        regions = []
-        for order in orders:
-            region = order['customer_region']
-            regions.append({
-                'region': region,
-                'customer_count': order['customer_count'],
-                'order_count': order['order_count']
-            })
+        regions = (
+            Order.objects
+            .filter(
+                customer_city='تهران',
+                customer_region__isnull=False
+            )
+            .exclude(customer_region='')
+            .annotate(
+                region_int=Cast('customer_region', IntegerField())
+            )
+            .values('customer_region', 'region_int')
+            .annotate(
+                customer_count=Count('customer_name', distinct=True),
+                order_count=Count('id')
+            )
+            .order_by('region_int')
+        )
+    
+        regions_list = [
+            {
+                'region': r['customer_region'],
+                'customer_count': r['customer_count'],
+                'order_count': r['order_count'],
+            }
+            for r in regions
+        ]
+    
         return Response({
-            'total_customers': sum(r['customer_count'] for r in regions),
-            'total_orders': sum(r['order_count'] for r in regions),
-            'regions': regions
+            'total_customers': sum(r['customer_count'] for r in regions_list),
+            'total_orders': sum(r['order_count'] for r in regions_list),
+            'regions': regions_list
         })
